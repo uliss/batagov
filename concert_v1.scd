@@ -8,7 +8,7 @@
 
 
 // 1) BOOT SERVER
-SoundCard.saffire;
+SoundCard.mbox;
 // 2) Buffer alloc
 ~part2_1 = Buffer.read(s, "/Users/serj/concerts/2016.06.09 - Batagov/sounds/batagov_test_2.1_mono.wav");
 ~part2_2 = Buffer.read(s, "/Users/serj/concerts/2016.06.09 - Batagov/sounds/batagov_test_2.2_mono.wav");
@@ -23,6 +23,18 @@ SoundCard.saffire;
 MIDIIn.connectAll;
 
 (
+Spec.add(\pan, [-1, 1]);
+Spec.add(\violaReject1, [220, 260]);
+Spec.add(\violaReject1, [220, 260]);
+Spec.add(\octaverAmp, [0, 1]);
+Spec.add(\dist, [6, 15]);
+Spec.add(\moogFreq, [4, 20]);
+Spec.add(\moogLevel, [0, 1]);
+Spec.add(\gain, [1, 5]);
+Spec.add(\detune, [1, 50]);
+
+Spec.add(\cadenceDelayFreq, [1, 10]);
+
 Ndef(\violaNormal, {
     |amp = 1|
     var out, in;
@@ -30,9 +42,8 @@ Ndef(\violaNormal, {
     // in = SPU_ViolaInCommon.ar();
     // in = SPU_ViolaReverb.ar(in, room: 0.7);
     // in = SPU_ViolaCompress.ar(SPU_ViolaFilter.ar(SPU_ViolaIn.ar(0)));
-    // in = PlayBuf.ar(1, ~part2_2, BufRateScale.kr(~part2_2), loop: 1);
-    out = Pan2.ar(in * amp.lag(2), 0);
-    out;
+    out = Pan2.ar(in * amp.lag(2), \pan.kr(-0.3));
+    out * \gain.kr(2);
 });
 
 
@@ -40,30 +51,21 @@ Ndef(\violaPart1, {
     |amp = 0.5, ratio = 1.0001|
     var in, sig, in2, in1, rfreq = 100.midicps, dist, distort = 1, in3, outL, outR;
     in = SPU_ViolaCompress.ar(SPU_ViolaFilter.ar(SPU_ViolaIn.ar(0)));
-    in = BRF.ar(in, 250, 0.1);
+    in = BRF.ar(in, \violaReject1.kr(250), 0.1);
     // in = BRF.ar(in, 430, 0.4);
-    // in = SPU_ViolaInCommon.ar;
-    // in = PlayBuf.ar(1, ~part2_1, BufRateScale.kr(~part2_1), loop: 1);
-    rfreq = Amplitude.ar(in, 1).linlin(0,1, 100, 1000);
-    // in = Ringz.ar(in, 50.midicps);
-    // in = Pluck.ar(in, Impulse.kr(10));
-    // in =  Ringz.ar(in, 1100);
-    // in = in.softclip;
 
-    in2 = PitchShift.ar(in, 0.2, 0.5) * 0.25; /// 2 movement 0.3
+    in2 = PitchShift.ar(in, 0.2, 0.5) * \octaverAmp.kr(0.25); /// 2 movement 0.3
 
-    dist = ((in + in2) * 13).tanh.softclip * distort.lag(0.5);
+    dist = ((in + in2) * \dist.kr(13)).tanh.softclip * distort.lag(0.5);
     in = dist * 0.1 * amp.lag(2);
 
-    in3 = MoogLadder.ar(in, LFTri.ar(10.reciprocal).range(250, 3000), 0.9);
-    in = XFade2.ar(in, in3, 0.5);
+    in3 = MoogLadder.ar(in, LFTri.ar(\moogFreq.kr(10).reciprocal).range(250, 3000), 0.9);
+    in = XFade2.ar(in, in3, \moogLevel.kr(0.5));
 
-    in1 = PitchShift.ar(in, 0.1, pitchRatio: 1.0006);
+    in1 = PitchShift.ar(in, 0.1, pitchRatio: \detune.kr(6) / 10000.0 +  1.0);
 
     // in2 = PitchShift.ar(in, pitchRatio: {1.0.linrand.linlin(0,1, 0.5, 2)} ! 10);
-    [in, in1] * 1.7;
-    // in = in.softclip * 0.2;
-    // AllpassL.ar(in, 1, 1, 1) ! 2;
+    [in, in1] * \gain.kr(3);
 });
 
 
@@ -105,41 +107,29 @@ Ndef(\violaPart2, {
     // sig = sig.distort;
     // sig = sig * sig;
     sig = sig.softclip;
-    sig = sig * amp.lag(2);
+    sig = sig * amp.lag(2) * 2;
 };
 );
 
-Ndef(\violaPart3, {
-/*    |amp = 0.5, distort = 1, ratio = 1.002 |
-    var out, in, chain, v;
-    // in = PlayBuf.ar(1, ~part2_3, BufRateScale.kr(~part2_3), loop: 1);
-    in = SPU_ViolaCompress.ar(SPU_ViolaFilter.ar(SPU_ViolaIn.ar(0)));
-    // default buffer size - 1024
-	chain = FFT(LocalBuf(512), in);
-    // v = MouseX.kr(0.1, 10);
-    v = 4;
-	chain = chain.pvcollect(512, {|mag, phase, index|
-        mag + DelayN.kr(mag, v, v*1.0.rand);
-	}, frombin: 0, tobin: 128, zeroothers: 1); // default bin: 256
-	out = IFFT(chain).dup * Line.kr();
-    out = Balance.ar(out, in) * amp.lag(2);
-    out;*/
-});
-
+Ndef(\violaCadence).clear;
 Ndef(\violaCadence, {
     arg amp = 1;
     var outL, outR, sig, sigD;
     sig = SPU_ViolaIn.ar(0);
     outL = AllpassL.ar(sig, 1, 0.3/*LFNoise0.kr(1, 0.3, 0.2)*/, 4);
     // outR = AllpassL.ar(sig, 8, LFNoise0.kr(1, 0.3, 0.5), 3);
-    outR = AllpassL.ar(PitchShift.ar(sig, 0.3, LFNoise1.kr(3, 2.3, 2), 0.1, 0.2), 1, 0.24, 3);
+    outR = AllpassL.ar(
+        PitchShift.ar(sig, 0.3,
+            LFNoise1.kr(\cadenceDelayFreq.kr(1), 2.3, 3), 0.1, 0.2), 1, 0.24, 3);
+
     // b = Buffer.alloc(s,44100 * 4, 2);
-    outR = Greyhole.ar(outR);
+    outR = Greyhole.ar(outR); // 3rd outR
     // sigD = AllpassL.ar(sig, )
     // outR = Impulse.ar(0.5);
     // PingPong.ar(LocalBuf(44100 * 4, 2), [left,right], LFNoise0.kr(1, 0.3, 0.2), 0.7, 1.1);
     // [outL], outR] * amp.lag(1);
-    Pan2.ar(outR, LFNoise1.ar(3).linlin(0,1, -1, 1)) * amp;
+    sig = Mono(outR * 0.4 + outL);
+    Pan2.ar(sig, LFNoise1.ar(3).linlin(0,1, -0.3, 0.3)) * amp * \gain.kr(3);
 });
 
 )
@@ -147,8 +137,6 @@ Ndef(\violaCadence, {
 
 // 5) CONTROL!
 (
-~n = NdefMixer(s);
-
 MIDIFunc.cc({ |m|
     if(m == 0) {
         Ndef(\violaPart1).stop;
@@ -184,6 +172,12 @@ MIDIFunc.cc({ |m|
         Ndef(\violaNormal).play;
     };
 }, 4);
+
+MIDIFunc.cc({ |m|
+    if(m == 127) {
+        {~n = NdefMixer(s)}.defer(0);
+    }
+}, 60);
 
 
 // PEDAL
