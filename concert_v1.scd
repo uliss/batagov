@@ -43,7 +43,7 @@ Ndef(\violaNormal, {
     // in = SPU_ViolaReverb.ar(in, room: 0.7);
     // in = SPU_ViolaCompress.ar(SPU_ViolaFilter.ar(SPU_ViolaIn.ar(0)));
     out = Pan2.ar(in * amp.lag(2), \pan.kr(-0.3));
-    out * \gain.kr(2);
+    out * \gain.kr(2.5);
 });
 
 
@@ -81,55 +81,49 @@ Ndef(\violaPart2, {
     // in = Mix.ar(in2) ! 2;
     sig = SPU_ViolaReverb.ar(SPU_ViolaFilter.ar(in), 0.7, 0.9, 0.5); // for 3 part 0.7, 0.9, 0.5
     // for begining - default
-    // sig = BPF.ar(PinkNoise.st)
     moog = Amplitude.kr(in, 1, 1).ampdb;
-    // moogf = moog.linlin(-70, 0, 300, 9000);
-    // amp.poll;
-    // moogf.poll;
-
-    // sig = MoogLadder.ar(sig, moogf, 1);
-    // sig = MoogLadder.ar(sig, LFNoise1.kr(0.2, 5000, 100), 0);
-    // sig = PitchShift.ar(in, 0.1, LFTri.kr(1).range(0, 0.1) + 1);
-    // sig.collapse;
-
-
     dist = (sig * 5).tanh.softclip * distort.lag(0.5);
-
-    // sig = MoogLadder.ar(sig, moogf, 0.1);
-    // sig = XFade2.ar(sig, dist, distort.linlin(0,1,-1,1));
-
     sig = HPF.ar(sig, 100);
-
-    // sig = AllpassN.ar(sig, 10, 10, 200);
-    // sig = BPF.ar(sig, LFNoise1.kr(40, 5000, 100));
-    // sig = LPF.ar(sig, 6000);
-    // sig = XFade2.ar(sig, dist, )
-    // sig = sig.distort;
-    // sig = sig * sig;
     sig = sig.softclip;
     sig = sig * amp.lag(2) * 2;
 };
 );
+
+Ndef(\violaLong).clear;
+Ndef(\violaLong, {
+    arg amp = 1;
+    var outL, outR, sig, sigD;
+    sig = Ndef(\violaNormal).ar;
+    sig = AllpassL.ar(sig, 1, 0.3, 4);
+    sig = Greyhole.ar(sig);
+    sig * amp * \gain.kr(1);
+});
 
 Ndef(\violaCadence).clear;
 Ndef(\violaCadence, {
     arg amp = 1;
     var outL, outR, sig, sigD;
     sig = SPU_ViolaIn.ar(0);
-    outL = AllpassL.ar(sig, 1, 0.3/*LFNoise0.kr(1, 0.3, 0.2)*/, 4);
+    outL = AllpassL.ar([sig,
+        PitchShift.ar(sig, 0.2, 1.4, 0.3),
+        PitchShift.ar(sig, 0.2, 1.1, 0.3),
+        PitchShift.ar(sig, 0.2, 1.2, 0.3)
+    ], 2, [1/7, 1/5, 1/3, 1/2] * 2, 2, [0.4, 0.3, 0.2, 0.35]);
+    // outL = AllpassL.ar(outL, 2, 0.281, 4, 0.3);
+    outL = NumChannels.ar(outL);
     // outR = AllpassL.ar(sig, 8, LFNoise0.kr(1, 0.3, 0.5), 3);
     outR = AllpassL.ar(
         PitchShift.ar(sig, 0.3,
             LFNoise1.kr(\cadenceDelayFreq.kr(1), 2.3, 3), 0.1, 0.2), 1, 0.24, 3);
 
     // b = Buffer.alloc(s,44100 * 4, 2);
-    outR = Greyhole.ar(outR); // 3rd outR
+    outR = Greyhole.ar(LPF.ar(outL, 1000)); // 3rd outR
     // sigD = AllpassL.ar(sig, )
     // outR = Impulse.ar(0.5);
     // PingPong.ar(LocalBuf(44100 * 4, 2), [left,right], LFNoise0.kr(1, 0.3, 0.2), 0.7, 1.1);
     // [outL], outR] * amp.lag(1);
-    sig = Mono(outR * 0.4 + outL);
-    Pan2.ar(sig, LFNoise1.ar(3).linlin(0,1, -0.3, 0.3)) * amp * \gain.kr(3);
+    sig = Mono(outR * 0.01 + outL);
+    Pan2.ar(sig, LFNoise1.ar(3).linlin(0,1, -0.3, 0.3)) * amp * \gain.kr(5);
 });
 
 )
@@ -147,14 +141,9 @@ MIDIFunc.cc({ |m|
 }, 1);
 MIDIFunc.cc({ |m|
     if(m == 0) {
-        Ndef(\violaPart2).stop;
+        Ndef(\violaLong).stop;
     } {
-        var r = 1 + 1.0.rand;
-        "Random ratio: %".format(r).postln;
-
-        Ndef(\violaPart2).set(\ratio, r);
-        Ndef(\violaPart2).play;
-        Ndef(\violaPart2).set(\ratio, r);
+        Ndef(\violaLong).play;
     };
 }, 2);
 MIDIFunc.cc({ |m|
@@ -189,6 +178,7 @@ MIDIFunc.cc({ |m|
     Ndef(\violaPart3).set(\amp, v);
     Ndef(\violaNormal).set(\amp, v);
     Ndef(\violaCadence).set(\amp, v);
+    Ndef(\violaLong).set(\amp, v);
 }, 7);
 
 )
