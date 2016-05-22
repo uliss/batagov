@@ -3,26 +3,32 @@
 // 1. boot SERVER
 // 2. init SYNTHS
 // 3. start CONTROL
-
-
+// BlueRig mapping:
+// - button [1]: Viola distortion
+// - button [2]: Viola long delay
+// - button [3]: Viola impro
+// - button [4]: Viola normal sound
+// - foot pedal [1]: volume
+// Korg Nanokontrol:
+// - [setup]: NdefMixer
 
 
 // 1) BOOT SERVER
+(
+"1. Server init".postln;
 SoundCard.mbox;
-// 2) Buffer alloc
-~part2_1 = Buffer.read(s, "/Users/serj/concerts/2016.06.09 - Batagov/sounds/batagov_test_2.1_mono.wav");
-~part2_2 = Buffer.read(s, "/Users/serj/concerts/2016.06.09 - Batagov/sounds/batagov_test_2.2_mono.wav");
-~part2_3 = Buffer.read(s, "/Users/serj/concerts/2016.06.09 - Batagov/sounds/batagov_test_2.3_mono.wav");
-
-// 3) TEST SOUND
-{SinOsc.ar(1220, mul: 0.005) ! 2}.scope
-{SPU_ViolaInCommon.ar}.scope
-
-// 4) INIT SYNTHS!!!!
-(
 MIDIIn.connectAll;
+"... go to step 2 >>>>>";
+)
 
+// 2) TEST SOUND
+{SinOsc.ar(1220 ! 2, mul: 0.005)}.scope
+
+// 3) INIT SYNTHS!!!!
 (
+
+"2. Init Synths".postln;
+
 Spec.add(\pan, [-1, 1]);
 Spec.add(\violaReject1, [220, 260]);
 Spec.add(\violaReject1, [220, 260]);
@@ -32,16 +38,12 @@ Spec.add(\moogFreq, [4, 20]);
 Spec.add(\moogLevel, [0, 1]);
 Spec.add(\gain, [1, 5]);
 Spec.add(\detune, [1, 50]);
-
 Spec.add(\cadenceDelayFreq, [1, 10]);
 
 Ndef(\violaNormal, {
     |amp = 1|
     var out, in;
     in = SoundIn.ar(0);
-    // in = SPU_ViolaInCommon.ar();
-    // in = SPU_ViolaReverb.ar(in, room: 0.7);
-    // in = SPU_ViolaCompress.ar(SPU_ViolaFilter.ar(SPU_ViolaIn.ar(0)));
     out = Pan2.ar(in * amp.lag(2), \pan.kr(-0.3));
     out * \gain.kr(2.5);
 });
@@ -63,8 +65,6 @@ Ndef(\violaPart1, {
     in = XFade2.ar(in, in3, \moogLevel.kr(0.5));
 
     in1 = PitchShift.ar(in, 0.1, pitchRatio: \detune.kr(6) / 10000.0 +  1.0);
-
-    // in2 = PitchShift.ar(in, pitchRatio: {1.0.linrand.linlin(0,1, 0.5, 2)} ! 10);
     [in, in1] * \gain.kr(3);
 });
 
@@ -72,13 +72,10 @@ Ndef(\violaPart1, {
 Ndef(\violaPart2, {
     |amp = 0.5, distort = 1, ratio = 1.002 |
     var in, in1, sig, in2, dist, moog, moogf;
-    // in = SoundIn.ar(0, amp.lag(0.5));
     in = SPU_ViolaCompress.ar(SPU_ViolaFilter.ar(SPU_ViolaIn.ar(0)));
-    // in = PlayBuf.ar(1, ~part2_1, BufRateScale.kr(~part2_1), loop: 1);
     in1 = PitchShift.ar(in, 0.1, pitchRatio: ratio) * 0.3;
     in2 = PitchShift.ar(in, 0.3, 0.5) * distort.lag(0.1) * 0.11;
     in = Mix.ar([[in, in1], in2]);
-    // in = Mix.ar(in2) ! 2;
     sig = SPU_ViolaReverb.ar(SPU_ViolaFilter.ar(in), 0.7, 0.9, 0.5); // for 3 part 0.7, 0.9, 0.5
     // for begining - default
     moog = Amplitude.kr(in, 1, 1).ampdb;
@@ -109,28 +106,24 @@ Ndef(\violaCadence, {
         PitchShift.ar(sig, 0.2, 1.1, 0.3),
         PitchShift.ar(sig, 0.2, 1.2, 0.3)
     ], 2, [1/7, 1/5, 1/3, 1/2] * 2, 2, [0.4, 0.3, 0.2, 0.35]);
-    // outL = AllpassL.ar(outL, 2, 0.281, 4, 0.3);
     outL = NumChannels.ar(outL);
-    // outR = AllpassL.ar(sig, 8, LFNoise0.kr(1, 0.3, 0.5), 3);
+
     outR = AllpassL.ar(
         PitchShift.ar(sig, 0.3,
             LFNoise1.kr(\cadenceDelayFreq.kr(1), 2.3, 3), 0.1, 0.2), 1, 0.24, 3);
 
-    // b = Buffer.alloc(s,44100 * 4, 2);
     outR = Greyhole.ar(LPF.ar(outL, 1000)); // 3rd outR
-    // sigD = AllpassL.ar(sig, )
-    // outR = Impulse.ar(0.5);
-    // PingPong.ar(LocalBuf(44100 * 4, 2), [left,right], LFNoise0.kr(1, 0.3, 0.2), 0.7, 1.1);
-    // [outL], outR] * amp.lag(1);
     sig = Mono(outR * 0.01 + outL);
     Pan2.ar(sig, LFNoise1.ar(3).linlin(0,1, -0.3, 0.3)) * amp * \gain.kr(5);
 });
 
-)
+"... go to step 3 >>>>>".postln;
 )
 
-// 5) CONTROL!
+// 4) CONTROL!
 (
+"3. Init MIDI and OSC".postln;
+
 MIDIFunc.cc({ |m|
     if(m == 0) {
         Ndef(\violaPart1).stop;
@@ -150,7 +143,6 @@ MIDIFunc.cc({ |m|
     if(m == 0) {
         Ndef(\violaCadence).stop;
     } {
-        // Ndef(\violaPart3).set(\ratio, 1.001);
         Ndef(\violaCadence).play;
     };
 }, 3);
@@ -181,34 +173,9 @@ MIDIFunc.cc({ |m|
     Ndef(\violaLong).set(\amp, v);
 }, 7);
 
-)
-
-
-(
-{
-    var in = SPU_ViolaInCommon.ar, in2;
-    in  = AllpassL.ar(in, 0.1, 0.1, 5);
-    in2 = Pan2.ar(in, 0);
-    Out.ar(0, in2);
-}.play();
+"Let's start'";
 
 )
-
-
-// GUI
-Ndef(\violaPart1).gui;
-Ndef(\violaPart1).play;
-Ndef(\violaPart2).gui;
-Ndef(\violaPart2).play;
-
-// TEST BUFFERS
-~part2_1.play;
-~part2_2.play;
-~part2_3.play;
-
-
-
-
 
 
 
