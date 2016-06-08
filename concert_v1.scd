@@ -16,13 +16,13 @@
 // 1) BOOT SERVER
 (
 "1. Server init".postln;
-SoundCard.mbox;
+SoundCard.saffire;
 MIDIIn.connectAll;
 "... go to step 2 >>>>>";
 )
 
 // 2) TEST SOUND
-{SinOsc.ar(1220 ! 2, mul: 0.005)}.scope
+{SinOsc.ar(420 ! 2, mul: 0.08)}.scope
 
 // 3) INIT SYNTHS!!!!
 (
@@ -40,15 +40,17 @@ Spec.add(\gain, [1, 5]);
 Spec.add(\detune, [1, 50]);
 Spec.add(\cadenceDelayFreq, [1, 10]);
 
+Ndef(\violaNormal).clear;
 Ndef(\violaNormal, {
     |amp = 1|
     var out, in;
     in = SoundIn.ar(0);
+    in = SPU_ViolaCompress.ar(in);
     out = Pan2.ar(in * amp.lag(2), \pan.kr(-0.3));
     out * \gain.kr(2.5);
 });
 
-
+Ndef(\violaPart1).clear;
 Ndef(\violaPart1, {
     |amp = 0.5, ratio = 1.0001|
     var in, sig, in2, in1, rfreq = 100.midicps, dist, distort = 1, in3, outL, outR;
@@ -61,6 +63,7 @@ Ndef(\violaPart1, {
     dist = ((in + in2) * \dist.kr(13)).tanh.softclip * distort.lag(0.5);
     in = dist * 0.1 * amp.lag(2);
 
+    // in3 = Silence.ar();
     in3 = MoogLadder.ar(in, LFTri.ar(\moogFreq.kr(10).reciprocal).range(250, 3000), 0.9);
     in = XFade2.ar(in, in3, \moogLevel.kr(0.5));
 
@@ -68,7 +71,7 @@ Ndef(\violaPart1, {
     [in, in1] * \gain.kr(3);
 });
 
-
+Ndef(\violaPart2).clear;
 Ndef(\violaPart2, {
     |amp = 0.5, distort = 1, ratio = 1.002 |
     var in, in1, sig, in2, dist, moog, moogf;
@@ -105,7 +108,7 @@ Ndef(\violaCadence, {
         PitchShift.ar(sig, 0.2, 1.4, 0.3),
         PitchShift.ar(sig, 0.2, 1.1, 0.3),
         PitchShift.ar(sig, 0.2, 1.2, 0.3)
-    ], 2, [1/7, 1/5, 1/3, 1/2] * 2, 2, [0.4, 0.3, 0.2, 0.35]);
+    ], 2, [1/7, 1/5, 1/3, 1/2] * 2, 2, [0.4, 0.3, 0.3, 0.35]);
     outL = NumChannels.ar(outL);
 
     outR = AllpassL.ar(
@@ -122,34 +125,43 @@ Ndef(\violaCadence, {
 
 // 4) CONTROL!
 (
+var d, l, c, a;
 "3. Init MIDI and OSC".postln;
 
 MIDIFunc.cc({ |m|
     if(m == 0) {
+        "DISTORTION OFF".postln;
         Ndef(\violaPart1).stop;
     } {
+        "DISTORTION ON".postln;
         Ndef(\violaPart1).set(\ratio, 1.001);
         Ndef(\violaPart1).play;
     };
 }, 1);
 MIDIFunc.cc({ |m|
     if(m == 0) {
+        "LONG OFF".postln;
         Ndef(\violaLong).stop;
     } {
+        "LONG ON".postln;
         Ndef(\violaLong).play;
     };
 }, 2);
 MIDIFunc.cc({ |m|
     if(m == 0) {
+        "CADENCE OFF".postln;
         Ndef(\violaCadence).stop;
     } {
+        "CADENCE ON".postln;
         Ndef(\violaCadence).play;
     };
 }, 3);
 MIDIFunc.cc({ |m|
     if(m == 0) {
+        "CLEAN OFF".postln;
         Ndef(\violaNormal).stop;
     } {
+        "CLEAN ON".postln;
         Ndef(\violaNormal).play;
     };
 }, 4);
@@ -164,13 +176,16 @@ MIDIFunc.cc({ |m|
 // PEDAL
 MIDIFunc.cc({ |m|
     var v = m.linlin(10, 127, 0, 1);
-    "AMP: %".format(v).postln;
-    Ndef(\violaPart1).set(\amp, v);
-    Ndef(\violaPart2).set(\amp, v);
-    Ndef(\violaPart3).set(\amp, v);
-    Ndef(\violaNormal).set(\amp, v);
-    Ndef(\violaCadence).set(\amp, v);
-    Ndef(\violaLong).set(\amp, v);
+    if(l != m) {
+        l = m;
+        "AMP: %".format(v).postln;
+        Ndef(\violaPart1).set(\amp, v);
+        Ndef(\violaPart2).set(\amp, v);
+        Ndef(\violaPart3).set(\amp, v);
+        Ndef(\violaNormal).set(\amp, v);
+        Ndef(\violaCadence).set(\amp, v);
+        Ndef(\violaLong).set(\amp, v);
+    }
 }, 7);
 
 "Let's start'";
