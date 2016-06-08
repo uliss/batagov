@@ -16,7 +16,7 @@
 // 1) BOOT SERVER
 (
 "1. Server init".postln;
-SoundCard.saffire;
+SoundCard.mbox;
 MIDIIn.connectAll;
 "... go to step 2 >>>>>";
 )
